@@ -1,5 +1,5 @@
-#ifndef DEF_JSON_HPP
-#define DEF_JSON_HPP
+#ifndef JSON_HPP
+#define JSON_HPP
 
 #include <string_view>
 #include <string>
@@ -114,9 +114,6 @@ namespace Json
         T& operator[](const std::string& key);
     };
 
-    template <class T>
-    using ScopedPtr = std::unique_ptr<T>;
-
     struct Node
     {
         friend class Parser;
@@ -131,8 +128,8 @@ namespace Json
             Object
         };
 
-        using ObjectType = OrderedUnorderedMap<ScopedPtr<Node>>;
-        using ArrayType = std::vector<ScopedPtr<Node>>;
+        using ObjectType = OrderedUnorderedMap<Node>;
+        using ArrayType = std::vector<Node>;
 
         union ValueType
         {
@@ -151,6 +148,9 @@ namespace Json
         std::string& String();
         bool& Bool();
         double& Number();
+
+        ArrayType& Array();
+        ObjectType& Object();
 
         bool IsArray() const;
         bool IsObject() const;
@@ -529,6 +529,9 @@ namespace Json
                     m_NextState = StateType::New;
                 break;
 
+                default:
+                    Utils::LogError("Unexpected state type: %d", (int)m_CurrentState);
+
                 }
             }
 
@@ -559,7 +562,7 @@ namespace Json
 
             for (auto& [name, index] : obj.Indecies)
             {
-                auto& value = *obj.Data[index];
+                auto& value = obj.Data[index];
 
                 PrintTabs(offset + tabSize);
                 output << '"' << name << "\": ";
@@ -602,7 +605,7 @@ namespace Json
 
             for (const auto& value : *m_Value.Array)
             {
-                value->Dump(output, offset + tabSize, tabSize);
+                value.Dump(output, offset + tabSize, tabSize);
                 output.put('\n');
             }
 
@@ -617,7 +620,7 @@ namespace Json
     Node& Node::operator[](const std::string& key)
     {
         if (IsObject())
-            return *(*m_Value.Object)[key];
+            return (*m_Value.Object)[key];
 
         throw std::out_of_range("Bad object key");
     }
@@ -625,7 +628,7 @@ namespace Json
     Node& Node::operator[](size_t index)
     {
         if (IsArray())
-            return *(*m_Value.Array)[index];
+            return (*m_Value.Array)[index];
 
         throw std::out_of_range("Array index subscript is out of range");
     }
@@ -650,6 +653,22 @@ namespace Json
     {
         if (IsNumber())
             return *m_Value.Number;
+
+        throw std::bad_cast();
+    }
+
+    Node::ArrayType& Node::Array()
+    {
+        if (IsArray())
+            return *m_Value.Array;
+
+        throw std::bad_cast();
+    }
+
+    Node::ObjectType& Node::Object()
+    {
+        if (IsObject())
+            return *m_Value.Object;
 
         throw std::bad_cast();
     }
@@ -777,9 +796,7 @@ namespace Json
         Expect(Detail::TokenType::OpColon);
 
         auto& valueNode = (*node.m_Value.Object)[key];
-        valueNode = std::make_unique<Node>();
-
-        ParseValue(*valueNode);
+        ParseValue(valueNode);
     }
 
     void Parser::ParseObject(Node& node)
@@ -813,10 +830,10 @@ namespace Json
         {
             NextToken();
 
-            node.m_Value.Array->push_back(std::make_unique<Node>());
+            node.m_Value.Array->push_back({});
 
             auto& valueNode = node.m_Value.Array->back();
-            ParseValue(*valueNode);
+            ParseValue(valueNode);
         }
         while (m_CurrentToken.Type == TT::OpComma);
 
