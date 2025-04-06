@@ -3,7 +3,12 @@
 
 int main(int argc, char* argv[])
 {
-    Json::Node test = Json::ParseFile("../test.json");
+    auto wrappedTest = Json::ParseFile("../test.json");
+    
+    if (!wrappedTest)
+        return 1;
+
+    Json::Node& test = wrappedTest.value();
 
     test.Dump();
 

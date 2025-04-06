@@ -1,4 +1,5 @@
 {
+    "C_Cpp.default.cppStandard": "c++17",
     "files.associations": {
         "atomic": "cpp",
         "bit": "cpp",
@@ -55,6 +56,7 @@
         "xmemory": "cpp",
         "xstring": "cpp",
         "xtr1common": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "optional": "cpp"
     }
 }

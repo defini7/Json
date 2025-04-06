@@ -10,6 +10,7 @@
 #include <cstdarg>
 #include <fstream>
 #include <sstream>
+#include <optional>
 
 namespace Json
 {
@@ -18,7 +19,7 @@ namespace Json
         namespace Utils
         {
             void LogError(const char* format, ...);
-            bool ReadFile(const std::string_view fileName, std::string& output);
+            std::optional<std::string> ReadFile(const std::string_view fileName);
         }
 
         enum class StateType
@@ -140,7 +141,7 @@ namespace Json
             ObjectType* Object;
         };
 
-        void Dump(std::ostream& output = std::cout, size_t offset = 0, size_t tabSize = 4) const;
+        void Dump(std::ostream& output = std::cout, bool newLine = true, size_t tabSize = 4, size_t offset = 0) const;
 
         Node& operator[](const std::string& key);
         Node& operator[](size_t index);
@@ -195,7 +196,7 @@ namespace Json
 
     };
 
-    Node ParseFile(const std::string_view fileName);
+    std::optional<Node> ParseFile(const std::string_view fileName);
     Node ParseRaw(const std::string_view raw);
 
 #ifdef JSON_IMPL
@@ -212,18 +213,20 @@ namespace Json
         va_end(args);
     }
 
-    bool Detail::Utils::ReadFile(const std::string_view fileName, std::string& output)
+    std::optional<std::string> Detail::Utils::ReadFile(const std::string_view fileName)
     {
         std::ifstream ifs(fileName.data());
 
         if (!ifs.is_open())
-            return false;
+            return std::nullopt;
 
+        std::string output;
         int c;
+
         while ((c = ifs.get()) != EOF)
             output.push_back(char(c));
 
-        return true;
+        return output;
     }
 
     std::string Detail::TokenTypeToString(TokenType type)
@@ -542,7 +545,7 @@ namespace Json
         return true;
     }
 
-    void Node::Dump(std::ostream& output, size_t offset, size_t tabSize) const
+    void Node::Dump(std::ostream& output, bool newLine, size_t tabSize, size_t offset) const
     {
         auto PrintTabs = [&](size_t spaces)
             {
@@ -580,6 +583,12 @@ namespace Json
 
             PrintTabs(offset);
             output << "},";
+
+            if (newLine)
+            {
+                output << std::endl;
+                PrintTabs(offset);
+            }
         }
         break;
 
@@ -622,7 +631,7 @@ namespace Json
         if (IsObject())
             return (*m_Value.Object)[key];
 
-        throw std::out_of_range("Bad object key");
+        throw std::out_of_range("[JSON] Bad object key");
     }
 
     Node& Node::operator[](size_t index)
@@ -630,7 +639,7 @@ namespace Json
         if (IsArray())
             return (*m_Value.Array)[index];
 
-        throw std::out_of_range("Array index subscript is out of range");
+        throw std::out_of_range("[JSON] Array index subscript is out of range");
     }
 
     std::string& Node::String()
@@ -848,12 +857,14 @@ namespace Json
         return std::string(ss.rdbuf()->str());
     }
 
-    Node ParseFile(const std::string_view fileName)
+    std::optional<Node> ParseFile(const std::string_view fileName)
     {
-        std::string raw;
-        Detail::Utils::ReadFile(fileName, raw);
+        auto raw = Detail::Utils::ReadFile(fileName);
 
-        return ParseRaw(raw);
+        if (!raw)
+            return std::nullopt;
+
+        return ParseRaw(raw.value());
     }
 
     Node ParseRaw(const std::string_view raw)
