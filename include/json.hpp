@@ -141,7 +141,7 @@ namespace Json
             ObjectType* Object;
         };
 
-        void Dump(std::ostream& output = std::cout, bool newLine = true, size_t tabSize = 4, size_t offset = 0) const;
+        void Dump(std::ostream& output = std::cout, size_t tabSize = 4, size_t offset = 0, bool last = true) const;
 
         Node& operator[](const std::string& key);
         Node& operator[](size_t index);
@@ -545,15 +545,16 @@ namespace Json
         return true;
     }
 
-    void Node::Dump(std::ostream& output, bool newLine, size_t tabSize, size_t offset) const
+    void Node::Dump(std::ostream& output, size_t tabSize, size_t offset, bool last) const
     {
-        auto PrintTabs = [&](size_t spaces)
-            {
-                for (size_t i = 0; i < spaces; i++)
+        auto tabulate = [&](size_t tabs)
+        {
+            for (size_t i = 0; i < tabs; i++)
+                for (size_t j = 0; j < tabSize; j++)
                     output.put(' ');
-            };
+        };
 
-        PrintTabs(offset);
+        tabulate(offset);
 
         switch (m_Type)
         {
@@ -563,63 +564,70 @@ namespace Json
 
             auto& obj = *m_Value.Object;
 
-            for (auto& [name, index] : obj.Indecies)
+            size_t i = 0;
+            for (const auto& [name, index] : obj.Indecies)
             {
                 auto& value = obj.Data[index];
 
-                PrintTabs(offset + tabSize);
+                tabulate(offset + 1);
                 output << '"' << name << "\": ";
+
+                bool isLast = i == obj.Indecies.size() - 1;
 
                 if (value.m_Type == Kind::Object || value.m_Type == Kind::Array)
                 {
-                    output << "\n";
-                    value.Dump(output, offset + tabSize, tabSize);
+                    output.put('\n');
+                    value.Dump(output, tabSize, offset + 1, isLast);
                 }
                 else
-                    value.Dump(output, 0, tabSize);
+                    value.Dump(output, tabSize, 0, isLast);
 
-                output << "\n";
+                output.put('\n');
+                i++;
             }
 
-            PrintTabs(offset);
-            output << "},";
-
-            if (newLine)
-            {
-                output << std::endl;
-                PrintTabs(offset);
-            }
+            tabulate(offset);
+            output << (last ? "}\n" : "},\n");
         }
         break;
 
         case Kind::Boolean:
-            output << std::boolalpha << *m_Value.Boolean << ',';
+            output << std::boolalpha << *m_Value.Boolean;
+            if (!last) output.put(',');
         break;
 
         case Kind::Number:
-            output << *m_Value.Number << ',';
+            output << *m_Value.Number;
+            if (!last) output.put(',');
         break;
 
         case Kind::String:
-            output << '"' << *m_Value.String << "\",";
+            output << '"' << *m_Value.String << '"';
+            if (!last) output.put(',');
         break;
 
         case Kind::Null:
             output << "null";
+            if (!last) output.put(',');
         break;
 
         case Kind::Array:
         {
             output << "[\n";
 
-            for (const auto& value : *m_Value.Array)
+            auto& ary = *m_Value.Array;
+
+            size_t i = 0;
+            for (const auto& value : ary)
             {
-                value.Dump(output, offset + tabSize, tabSize);
+                value.Dump(output, tabSize, offset + 1, i == ary.size() - 1);
                 output.put('\n');
+
+                i++;
             }
 
-            PrintTabs(offset);
-            output << "],";
+            tabulate(offset);
+            output << (last ? "]\n" : "],\n");
         }
         break;
 
@@ -852,7 +860,7 @@ namespace Json
     std::string Dump(const Node& node, size_t tabSize)
     {
         std::stringstream ss;
-        node.Dump(ss, 0, tabSize);
+        node.Dump(ss, tabSize, 0, true);
 
         return std::string(ss.rdbuf()->str());
     }

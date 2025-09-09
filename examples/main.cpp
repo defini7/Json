@@ -3,17 +3,15 @@
 
 int main(int argc, char* argv[])
 {
-    auto wrappedTest = Json::ParseFile("../test.json");
-    
-    if (!wrappedTest)
-        return 1;
+    if (auto cfgOpt = Json::ParseFile("test.json"))
+    {
+        Json::Node& cfg = *cfgOpt;
 
-    Json::Node& test = wrappedTest.value();
+        cfg.Dump();
 
-    test.Dump();
+        auto& a = cfg["list"].Array();
 
-    auto& a = test["list"].Array();
-
-    for (auto& val : a)
-        std::cout << val.Number() << std::endl;
+        for (auto& val : a)
+            std::cout << val.Number() << std::endl;
+    }    
 }
